@@ -144,6 +144,16 @@ def save_checkpoint_weight_file(model,
                                 batch,
                                 loss,
                                 weight_file_path):
+    """
+    Saving training checkpoint.
+    Args:
+        model (nn.Module)): Detector model to save.
+        optimizer (optim.Optimizer): Optimizer for saving optimizer state.
+        epoch (int): Current number of trained epochs.
+        batch (int): Current batch number in epoch.
+        loss (float): Current loss value.
+        weight_file_path (str): Checkpoint file path.
+    """
     torch.save({
         'epoch': epoch,
         'batch': batch,

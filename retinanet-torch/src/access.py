@@ -5,15 +5,11 @@ Collection of accessibility routines for data sets and model.
 import torch
 import collections
 import logging
-from torch.utils.data import DataLoader
 
 from src.model.retina_net import _validate_trainable_layers, RetinaNet
 from src.model.backbone_utils import resnet_fpn_backbone
 from src.model.fpn import LastLevelP6P7
-# from src.yolov3_config import YOLOV3Config
-# from src.model import YoloNetV3
 from src.datasets.image import image_dataloader
-# from src.datasets.caltech import CaltechPedDataset
 from src.datasets.coco_torchvision import coco_dataloader
 from src.datasets.voc_torchvision import voc_dataloader
 from src.datasets.kitti_torchvision import kitti_dataloader
@@ -96,8 +92,6 @@ def load_dataset(name,
                  annot_dir,
                  img_size,
                  batch_size,
-                 # n_cpu,
-                 # shuffle,
                  train,
                  **kwargs):
     """

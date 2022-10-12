@@ -32,7 +32,7 @@ def yolov3_loss(detection, tgt, tgt_len, img_size, average=True):
     Returns:
         (tuple(torch.Tensor)): Total, localization, confidence and probability loss scalar.
     """
-    n_batch, n_tgt_max, n_attributes = tgt.size()
+    n_batch, _, n_attributes = tgt.size()
 
     raw_pred = torch.cat([detection[i][0].view(n_batch, -1, n_attributes) for i in range(3)], dim=1)
 
