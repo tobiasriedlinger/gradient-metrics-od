@@ -8,7 +8,4 @@ The object detectors all implement a pipeline for computing gradient uncertainty
 The folder uncertainty_aggregation contains the framework we used for aggregating uncertainty metrics in meta classification and meta regression, as well as the main experimental setups once gradient-based and Monte-Carlo dropout-based uncertainty metrics have been produced.
 We included a more detailed description in the README.md-file in the folder itself.
 
-__Code still under development.__
-
 ArXiv: [https://arxiv.org/abs/2107.04517](https://arxiv.org/abs/2107.04517)
-

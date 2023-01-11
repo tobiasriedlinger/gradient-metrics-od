@@ -1,6 +1,6 @@
 from production.forward_pass_experiment import forward_ex
 detector_settings = dict(num_classes=20,
-                         weight_path="/home/OD/yolov3-torch-lfs/weights/voc2012/retrain/ckpt_lr_1e-5e+00_ep_29_map_0.642_mf1_0.709.pt",
+                         weight_path="/home/OD/yolov3-torch-lfs/weights/voc2012/retrain/ckpt_lr_1e-5e+00_ep_29.pt",
                          weight_is_ckpt=True,
                          dropout_rate=0.0,
                          score_thresh=1e-2

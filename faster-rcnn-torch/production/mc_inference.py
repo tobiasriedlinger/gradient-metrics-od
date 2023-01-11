@@ -16,7 +16,7 @@ mc_ex = Experiment("Compute MC dropout metrics for Faster R-CNN")
 @mc_ex.config
 def mc_config():
     detector_settings = dict(num_classes=80,
-                             weight_path="/home/riedlinger/OD/faster-rcnn-torch-lfs/weights/coco/retrain/ckpt_lr_1e-6e+00_ep_3_map_0.486_mf1_0.286.pt",
+                             weight_path="/home/riedlinger/OD/faster-rcnn-torch-lfs/weights/coco/retrain/ckpt_lr_1e-6e+00_ep_3.pt",
                              from_ckpt=True,
                              score_thresh=0.01
                              )
@@ -30,14 +30,15 @@ def mc_config():
 
 @mc_ex.automain
 def mc_main(detector_settings,
-               data_settings,
-               dir_id=None,
-               num_runs=30
-               ):
+            data_settings,
+            dir_id=None,
+            num_runs=30
+            ):
     det_s = detector_settings
     data_s = data_settings
 
-    columns = ["dataset_box_id", "file_path", "xmin", "ymin", "xmax", "ymax", "s", "category_idx", "gradient_metrics"]
+    columns = ["dataset_box_id", "file_path", "xmin", "ymin",
+               "xmax", "ymax", "s", "category_idx", "gradient_metrics"]
 
     dl = load_dataset(name="image_folder",
                       img_dir=data_s["img_dir"],
@@ -89,14 +90,17 @@ def mc_main(detector_settings,
         rpn_anchors = model.rpn.anchor_generator(images, rpn_fts)
 
         rpn_num_images = len(rpn_anchors)
-        rpn_num_anchors_per_level_shape_tensors = [o[0].shape for o in rpn_objectness]
-        rpn_num_anchors_per_level = [s[0] * s[1] * s[2] for s in rpn_num_anchors_per_level_shape_tensors]
+        rpn_num_anchors_per_level_shape_tensors = [
+            o[0].shape for o in rpn_objectness]
+        rpn_num_anchors_per_level = [s[0] * s[1] * s[2]
+                                     for s in rpn_num_anchors_per_level_shape_tensors]
         rpn_objectness, rpn_pred_bbox_deltas = \
             concat_box_prediction_layers(rpn_objectness, rpn_pred_bbox_deltas)
         # apply pred_bbox_deltas to anchors to obtain the decoded proposals
         # note that we detach the deltas because Faster R-CNN do not backprop through
         # the proposals
-        rpn_proposals = model.rpn.box_coder.decode(rpn_pred_bbox_deltas.detach(), rpn_anchors)
+        rpn_proposals = model.rpn.box_coder.decode(
+            rpn_pred_bbox_deltas.detach(), rpn_anchors)
         rpn_proposals = rpn_proposals.view(rpn_num_images, -1, 4)
         proposals, prop_scores = model.rpn.filter_proposals(rpn_proposals,
                                                             rpn_objectness,
@@ -120,19 +124,21 @@ def mc_main(detector_settings,
         cats = np.zeros((det_per_img, num_runs))
 
         model.roi_heads.box_predictor.dropout = 0.0
-        zclass_logits, zbox_regression = model.roi_heads.box_predictor(roi_features)
+        zclass_logits, zbox_regression = model.roi_heads.box_predictor(
+            roi_features)
         min_num_det = 0
 
         for i in range(num_runs):
             model.roi_heads.box_predictor.dropout = 0.5
-            class_logits, box_regression = model.roi_heads.box_predictor(roi_features)
+            class_logits, box_regression = model.roi_heads.box_predictor(
+                roi_features)
 
             result = []
             boxes, _, labels = model.roi_heads.postprocess_detections(zclass_logits,
-                                                                        box_regression,
-                                                                        proposals,
-                                                                        images.image_sizes,
-                                                                        )
+                                                                      box_regression,
+                                                                      proposals,
+                                                                      images.image_sizes,
+                                                                      )
             _, scores, _ = model.roi_heads.postprocess_detections(class_logits,
                                                                   zbox_regression,
                                                                   proposals,
@@ -153,16 +159,21 @@ def mc_main(detector_settings,
                                                      original_image_sizes
                                                      )
 
-            n_det = min(len(detections[0]["boxes"]), len(detections[0]["scores"]))
+            n_det = min(len(detections[0]["boxes"]),
+                        len(detections[0]["scores"]))
             if i == 0:
                 min_num_det = n_det
             else:
                 if n_det < min_num_det:
                     min_num_det = n_det
-            xmins[:n_det, i] = detections[0]["boxes"][:n_det, 0].detach().cpu().numpy()
-            ymins[:n_det, i] = detections[0]["boxes"][:n_det, 1].detach().cpu().numpy()
-            xmaxs[:n_det, i] = detections[0]["boxes"][:n_det, 2].detach().cpu().numpy()
-            ymaxs[:n_det, i] = detections[0]["boxes"][:n_det, 3].detach().cpu().numpy()
+            xmins[:n_det, i] = detections[0]["boxes"][:n_det,
+                                                      0].detach().cpu().numpy()
+            ymins[:n_det, i] = detections[0]["boxes"][:n_det,
+                                                      1].detach().cpu().numpy()
+            xmaxs[:n_det, i] = detections[0]["boxes"][:n_det,
+                                                      2].detach().cpu().numpy()
+            ymaxs[:n_det, i] = detections[0]["boxes"][:n_det,
+                                                      3].detach().cpu().numpy()
             s[:n_det, i] = detections[0]["scores"][:n_det].detach().cpu().numpy()
             cats[:n_det, i] = detections[0]["labels"][:n_det].detach().cpu().numpy()
 
@@ -188,4 +199,3 @@ def mc_main(detector_settings,
             tgt_path = f"{data_s['target_dir']}/mc_uncertainty/csv"
         os.makedirs(tgt_path, exist_ok=True)
         df.to_csv(f"{tgt_path}/{raw_name}_mc.csv")
-

@@ -11,7 +11,7 @@ from tqdm import tqdm
 from production.get_forwards import cxcywh_to_border
 from src.main import load_yolov3_model, load_dataset
 from src.utils import untransform_bboxes
-from src.training_old import iou_batch
+from src.inference import iou
 from src.yolov3_loss import get_targets
 
 
@@ -45,6 +45,7 @@ class GetGradientMetrics(object):
     """
     Container class for gradient metric computation pipeline.
     """
+
     def __init__(self, config):
         self.cfg = config
         # Load YOLO model in train mode, such that we get the prediction transformed to image dimensions,
@@ -91,11 +92,13 @@ class GetGradientMetrics(object):
             padding = item[3].to(dev)
             detection = self.model(img)
 
-            raw_pred = torch.cat([detection[i][0].view(1, -1, self.cfg.num_attrib) for i in range(3)], dim=1)
+            raw_pred = torch.cat([detection[i][0].view(
+                1, -1, self.cfg.num_attrib) for i in range(3)], dim=1)
             output = torch.cat([detection[i][1] for i in range(3)], dim=1)
 
             # Transformed prediction w.r.t. original image dimensions:
-            coords = untransform_bboxes(output[..., :4].clone(), scale[0], padding[0]).detach()
+            coords = untransform_bboxes(
+                output[..., :4].clone(), scale[0], padding[0]).detach()
 
             # Remember that we need as ground truth boxed w.r.t. network input dimensions, though.
             total_num_predictions = coords.shape[1]
@@ -111,29 +114,38 @@ class GetGradientMetrics(object):
                 pgt = soft_thr_det[instance_id, ...].view(1, 1, -1).clone()
                 pgt[..., 4] = 1.0
                 pgt_class = torch.argmax(pgt[..., 5:], dim=2).squeeze(1)
-                pgt[..., 5:] = torch.nn.functional.one_hot(pgt_class, num_classes=self.cfg.num_classes)
+                pgt[..., 5:] = torch.nn.functional.one_hot(
+                    pgt_class, num_classes=self.cfg.num_classes)
                 # Get candidates for pgt
-                candidate_ids = (iou_batch(output, pgt).squeeze(2) >= self.cfg.iou_thresh) & \
-                                (torch.argmax(output[..., 5:], dim=2) == pgt_class.squeeze().item())
+                candidate_ids = (iou(output, pgt).squeeze(2) >= self.cfg.iou_thresh) & \
+                                (torch.argmax(
+                                    output[..., 5:], dim=2) == pgt_class.squeeze().item())
 
-                pgt_t, pos_mask, neg_mask = get_targets(pgt, torch.tensor([[1]], dtype=torch.long), self.cfg.img_size)
+                pgt_t, pos_mask, neg_mask = get_targets(
+                    pgt, torch.tensor([[1]], dtype=torch.long), self.cfg.img_size)
 
-                loc_bce = torch.sum(bce(raw_pred[:, :, :2], pgt_t[:, :, :2], reduction="none"), dim=2)
-                loc_mse = torch.sum(mse(raw_pred[:, :, 2:4], pgt_t[:, :, 2:4], reduction="none"), dim=2)
+                loc_bce = torch.sum(
+                    bce(raw_pred[:, :, :2], pgt_t[:, :, :2], reduction="none"), dim=2)
+                loc_mse = torch.sum(
+                    mse(raw_pred[:, :, 2:4], pgt_t[:, :, 2:4], reduction="none"), dim=2)
                 # Use candidate indices instead of pos bbox indices for loss computation
-                loc_loss = 2 * torch.sum(loc_bce[candidate_ids] + loc_mse[candidate_ids])
+                loc_loss = 2 * \
+                    torch.sum(loc_bce[candidate_ids] + loc_mse[candidate_ids])
 
-                conf_bce = bce(raw_pred[:, :, 4], pgt_t[:, :, 4].float(), reduction="none")
+                conf_bce = bce(
+                    raw_pred[:, :, 4], pgt_t[:, :, 4].float(), reduction="none")
                 conf_loss = torch.sum(conf_bce[candidate_ids])
 
-                prob_bce = torch.sum(bce(raw_pred[:, :, 5:], pgt_t[:, :, 5:].float(), reduction="none"), dim=2)
+                prob_bce = torch.sum(
+                    bce(raw_pred[:, :, 5:], pgt_t[:, :, 5:].float(), reduction="none"), dim=2)
                 prob_loss = torch.sum(prob_bce[candidate_ids])
 
                 losses = torch.stack([loc_loss, conf_loss, prob_loss])
 
                 instance_dict = {}
                 for loss_id, t in enumerate(losses):
-                    g = torch.autograd.grad(t, list(self.weight_dict.values()), grad_outputs=None, retain_graph=True)
+                    g = torch.autograd.grad(
+                        t, list(self.weight_dict.values()), grad_outputs=None, retain_graph=True)
                     instance_dict[self.cfg.loss_contributions[loss_id]] = dict([(list(self.weight_dict.keys())[ind],
                                                                                 map_grad_tensor_to_numbers(v))
                                                                                for ind, v in enumerate(g)])
@@ -153,7 +165,8 @@ class GetGradientMetrics(object):
             df["category_idx"] = np.argmax(probs, axis=1)
             df["probs_sum"] = np.sum(probs, axis=1)
             df[self.cfg.probabilities] = probs
-            df["dataset_box_id"] = np.arange(id_count, id_count+total_num_predictions)[soft_thr_mask[0].cpu().numpy()]
+            df["dataset_box_id"] = np.arange(
+                id_count, id_count+total_num_predictions)[soft_thr_mask[0].cpu().numpy()]
             df["gradient_metrics"] = gradient_list
             id_count += total_num_predictions
 

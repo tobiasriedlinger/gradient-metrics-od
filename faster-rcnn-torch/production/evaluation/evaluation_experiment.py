@@ -21,7 +21,7 @@ eval_ex = Experiment("Evaluate Faster R-CNN")
 def eval_cfg():
     # Detector Settings
     detector_settings = dict(num_classes=80,
-                             weight_path="/home/riedlinger/OD/faster-rcnn-torch-lfs/weights/coco/retrain/ckpt_lr_1e-6e+00_ep_2_map_0.498_mf1_0.0496.pt",
+                             weight_path="/home/riedlinger/OD/faster-rcnn-torch-lfs/weights/coco/retrain/ckpt_lr_1e-6e+00_ep_2",
                              from_ckpt=True,
                              )
 
@@ -60,7 +60,7 @@ def run_evaluation(detector_settings,
     model.to(dev)
     print(f"Loaded checkpoint from {det_s['weight_path']}.")
 
-    model.roi_heads.score_thresh = 0.00001 
+    model.roi_heads.score_thresh = 0.00001
     model.roi_heads.box_predictor.dropout = 0.0
     model.roi_heads.detections_per_img = 150
 

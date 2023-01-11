@@ -17,7 +17,7 @@ grads_ex = Experiment("Compute Gradients for Faster R-CNN")
 @grads_ex.config
 def grads_config():
     detector_settings = dict(num_classes=80,
-                             weight_path="/home/riedlinger/OD/faster-rcnn-torch-lfs/weights/coco/retrain/ckpt_lr_1e-6e+00_ep_3_map_0.486_mf1_0.286.pt",
+                             weight_path="/home/riedlinger/OD/faster-rcnn-torch-lfs/weights/coco/retrain/ckpt_lr_1e-6e+00_ep_3.pt",
                              from_ckpt=True,
                              score_thresh=0.01
                              )
@@ -51,7 +51,8 @@ def grads_main(detector_settings,
     det_s = detector_settings
     data_s = data_settings
 
-    columns = ["dataset_box_id", "file_path", "xmin", "ymin", "xmax", "ymax", "s", "category_idx", "gradient_metrics"]
+    columns = ["dataset_box_id", "file_path", "xmin", "ymin",
+               "xmax", "ymax", "s", "category_idx", "gradient_metrics"]
 
     dl = load_dataset(name="image_folder",
                       img_dir=data_s["img_dir"],
@@ -74,7 +75,7 @@ def grads_main(detector_settings,
     loss_contributions = ["rpn_obj", "rpn_reg", "roi_class", "roi_reg"]
 
     weight_dict = [{"rpn_conv": model.rpn.head.conv.weight,
-                       "rpn_cls": model.rpn.head.cls_logits.weight},
+                    "rpn_cls": model.rpn.head.cls_logits.weight},
                    {"rpn_conv": model.rpn.head.conv.weight,
                        "rpn_reg": model.rpn.head.bbox_pred.weight},
                    {"roi_fc_7": model.roi_heads.box_head.fc7.weight,
@@ -113,14 +114,17 @@ def grads_main(detector_settings,
         rpn_anchors = model.rpn.anchor_generator(images, rpn_fts)
 
         rpn_num_images = len(rpn_anchors)
-        rpn_num_anchors_per_level_shape_tensors = [o[0].shape for o in rpn_objectness]
-        rpn_num_anchors_per_level = [s[0] * s[1] * s[2] for s in rpn_num_anchors_per_level_shape_tensors]
+        rpn_num_anchors_per_level_shape_tensors = [
+            o[0].shape for o in rpn_objectness]
+        rpn_num_anchors_per_level = [s[0] * s[1] * s[2]
+                                     for s in rpn_num_anchors_per_level_shape_tensors]
         rpn_objectness, rpn_pred_bbox_deltas = \
             concat_box_prediction_layers(rpn_objectness, rpn_pred_bbox_deltas)
         # apply pred_bbox_deltas to anchors to obtain the decoded proposals
         # note that we detach the deltas because Faster R-CNN do not backprop through
         # the proposals
-        rpn_proposals = model.rpn.box_coder.decode(rpn_pred_bbox_deltas.detach(), rpn_anchors)
+        rpn_proposals = model.rpn.box_coder.decode(
+            rpn_pred_bbox_deltas.detach(), rpn_anchors)
         rpn_proposals = rpn_proposals.view(rpn_num_images, -1, 4)
         proposals, prop_scores = model.rpn.filter_proposals(rpn_proposals,
                                                             rpn_objectness,
@@ -133,7 +137,8 @@ def grads_main(detector_settings,
                                                     images.image_sizes
                                                     )
         roi_features = model.roi_heads.box_head(roi_features)
-        class_logits, box_regression = model.roi_heads.box_predictor(roi_features)
+        class_logits, box_regression = model.roi_heads.box_predictor(
+            roi_features)
 
         result = []
         boxes, scores, labels = model.roi_heads.postprocess_detections(class_logits,
@@ -150,7 +155,6 @@ def grads_main(detector_settings,
                     "scores": scores[i],
                 }
             )
-
 
         detections = model.transform.postprocess(result,
                                                  images.image_sizes,
@@ -191,7 +195,8 @@ def grads_main(detector_settings,
 
             instance_dict = {}
             for loss_id, t in enumerate([rpn_obj_loss, rpn_reg_loss, roi_class_loss, roi_reg_loss]):
-                g = torch.autograd.grad(t, list(weight_dict[loss_id].values()), grad_outputs=None, retain_graph=True)
+                g = torch.autograd.grad(
+                    t, list(weight_dict[loss_id].values()), grad_outputs=None, retain_graph=True)
                 instance_dict[loss_contributions[loss_id]] = dict([(list(weight_dict[loss_id].keys())[ind],
                                                                     map_grad_tensor_to_numbers(v))
                                                                    for ind, v in enumerate(g)])
@@ -230,4 +235,3 @@ def grads_main(detector_settings,
             df.to_csv(f"{csv_folder}/{raw_name}_grads.csv")
         else:
             print("No directory identifier specified.")
-
